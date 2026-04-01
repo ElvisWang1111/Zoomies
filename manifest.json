@@ -1,0 +1,47 @@
+{
+  "manifest_version": 3,
+  "name": "Zoomies : AI Output Cat Monitor",
+  "description": "Monitor ChatGPT/Gemini/Claude/DeepSeek generation status with a running cat overlay.",
+  "version": "0.1.0",
+  "permissions": ["storage", "tabs", "scripting"],
+  "host_permissions": [
+    "https://chatgpt.com/*",
+    "https://chat.openai.com/*",
+    "https://gemini.google.com/*",
+    "https://claude.ai/*",
+    "https://chat.deepseek.com/*",
+    "https://www.deepseek.com/*",
+    "https://deepseek.com/*"
+  ],
+  "background": {
+    "service_worker": "src/background/worker.js"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["src/assets/*"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "icons": {
+    "16": "src/assets/cat1.png",
+    "32": "src/assets/cat1.png",
+    "48": "src/assets/cat1.png",
+    "128": "src/assets/cat1.png"
+  },
+  "action": {
+    "default_title": "Zoomies : AI Output Cat Monitor",
+    "default_icon": {
+      "16": "src/assets/cat1.png",
+      "32": "src/assets/cat1.png",
+      "48": "src/assets/cat1.png",
+      "128": "src/assets/cat1.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/common/protocol.js", "src/content/main.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
