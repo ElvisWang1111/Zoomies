@@ -11,14 +11,16 @@
     CHATGPT: "chatgpt",
     GEMINI: "gemini",
     CLAUDE: "claude",
-    DEEPSEEK: "deepseek"
+    DEEPSEEK: "deepseek",
+    KIMI: "kimi"
   };
 
   const SITE_LABELS = {
     [SITES.CHATGPT]: "ChatGPT",
     [SITES.GEMINI]: "Gemini",
     [SITES.CLAUDE]: "Claude",
-    [SITES.DEEPSEEK]: "DeepSeek"
+    [SITES.DEEPSEEK]: "DeepSeek",
+    [SITES.KIMI]: "Kimi"
   };
 
   const STATUS = {

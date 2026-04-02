@@ -6,7 +6,8 @@ const DEFAULT_SITE_ENABLED = {
   [SITES.CHATGPT]: true,
   [SITES.GEMINI]: true,
   [SITES.CLAUDE]: true,
-  [SITES.DEEPSEEK]: true
+  [SITES.DEEPSEEK]: true,
+  [SITES.KIMI]: true
 };
 
 const statusByTabSite = new Map();
@@ -62,6 +63,9 @@ function detectSiteFromUrl(urlString) {
     }
     if (/(^|\.)chat\.deepseek\.com$/i.test(host) || /(^|\.)deepseek\.com$/i.test(host) || /(^|\.)www\.deepseek\.com$/i.test(host)) {
       return SITES.DEEPSEEK;
+    }
+    if (/(^|\.)kimi\.moonshot\.cn$/i.test(host) || /(^|\.)kimi\.com$/i.test(host) || /(^|\.)www\.kimi\.com$/i.test(host)) {
+      return SITES.KIMI;
     }
     return null;
   } catch {

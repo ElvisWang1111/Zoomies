@@ -9,6 +9,7 @@ A Chrome Manifest V3 extension that monitors whether AI sites are generating out
 - Gemini: `gemini.google.com`
 - Claude: `claude.ai`
 - DeepSeek: `chat.deepseek.com`, `deepseek.com`, `www.deepseek.com`
+- Kimi: `kimi.moonshot.cn`, `kimi.com`, `www.kimi.com`
 
 ## Core Features (Current Implementation)
 - Per-site adapter based generation detection (`generating` / `idle`).
@@ -51,7 +52,7 @@ Key constants (see `src/content/main.js`):
 - `REGISTER_VIEW`: reserved (currently unused)
 
 ## Local Storage Keys
-- `siteEnabled`: `{ chatgpt, gemini, claude, deepseek }` (default all enabled)
+- `siteEnabled`: `{ chatgpt, gemini, claude, deepseek, kimi }` (default all enabled)
 - `debug`: `boolean` (default `false`)
 - `catCollapsed`: `boolean` (panel collapsed state)
 

@@ -12,15 +12,22 @@
     { site: SITES.CLAUDE, pattern: /(^|\.)claude\.ai$/i },
     { site: SITES.DEEPSEEK, pattern: /(^|\.)chat\.deepseek\.com$/i },
     { site: SITES.DEEPSEEK, pattern: /(^|\.)deepseek\.com$/i },
-    { site: SITES.DEEPSEEK, pattern: /(^|\.)www\.deepseek\.com$/i }
+    { site: SITES.DEEPSEEK, pattern: /(^|\.)www\.deepseek\.com$/i },
+    { site: SITES.KIMI, pattern: /(^|\.)kimi\.moonshot\.cn$/i },
+    { site: SITES.KIMI, pattern: /(^|\.)kimi\.com$/i },
+    { site: SITES.KIMI, pattern: /(^|\.)www\.kimi\.com$/i }
   ];
 
   const MIN_SWITCH_MS = 700;
   const IDLE_BY_INACTIVITY_MS = 2200;
   const CHECK_INTERVAL_MS = 900;
+  const KIMI_HINT_MS = 1200;
 
-  const STOP_KEYWORDS = ["stop", "停止", "cancel"];
+  const STOP_KEYWORDS = ["stop", "停止", "停止生成"];
+  const GEMINI_STOP_KEYWORDS = ["stop generating", "stop response", "停止生成", "停止回答", "停止输出"];
   const SEND_KEYWORDS = ["send", "发送", "submit", "run"];
+  const RETRY_KEYWORDS = ["retry", "regenerate", "重新生成", "重试", "再试一次"];
+  const KIMI_HINT_CLICK_KEYWORDS = ["send", "发送", "submit"];
   const UI_STRINGS = {
     zh: {
       panelTitle: "LLM 状态概览",
@@ -48,6 +55,7 @@
 
   let debugEnabled = false;
   const lang = detectUiLang();
+  let kimiGeneratingHintUntil = 0;
 
   function detectUiLang() {
     const raw = (chrome.i18n?.getUILanguage?.() || navigator.language || "en").toLowerCase();
@@ -68,6 +76,52 @@
     return (value || "").toString().trim().toLowerCase();
   }
 
+  function queryAll(root, selector, options = {}) {
+    const includeShadow = !!options.includeShadow;
+    const limit = Number.isFinite(options.limit) ? options.limit : Infinity;
+    if (!root || typeof root.querySelectorAll !== "function") {
+      return [];
+    }
+
+    if (!includeShadow) {
+      const nodes = Array.from(root.querySelectorAll(selector));
+      return Number.isFinite(limit) ? nodes.slice(0, limit) : nodes;
+    }
+
+    const out = [];
+    const stack = [root];
+    const visited = new Set();
+
+    while (stack.length > 0 && out.length < limit) {
+      const scope = stack.pop();
+      if (!scope || visited.has(scope) || typeof scope.querySelectorAll !== "function") {
+        continue;
+      }
+      visited.add(scope);
+
+      const matched = scope.querySelectorAll(selector);
+      for (const el of matched) {
+        out.push(el);
+        if (out.length >= limit) {
+          return out;
+        }
+      }
+
+      const allElements = scope.querySelectorAll("*");
+      for (const el of allElements) {
+        if (el?.shadowRoot) {
+          stack.push(el.shadowRoot);
+        }
+      }
+    }
+
+    return out;
+  }
+
+  function hasSelector(root, selector, options = {}) {
+    return queryAll(root, selector, { ...options, limit: 1 }).length > 0;
+  }
+
   function elementTextBucket(el) {
     if (!el) {
       return "";
@@ -82,8 +136,8 @@
     return normalizeText(parts.filter(Boolean).join(" "));
   }
 
-  function hasKeywordControl(root, keywords) {
-    const controls = root.querySelectorAll("button, [role='button']");
+  function hasKeywordControl(root, keywords, options = {}) {
+    const controls = queryAll(root, "button, [role='button']", options);
     for (const ctrl of controls) {
       const bucket = elementTextBucket(ctrl);
       for (const keyword of keywords) {
@@ -95,8 +149,8 @@
     return false;
   }
 
-  function hasLikelyEnabledSendControl(root) {
-    const controls = root.querySelectorAll("button, [role='button']");
+  function hasLikelyEnabledSendControl(root, options = {}) {
+    const controls = queryAll(root, "button, [role='button']", options);
     for (const ctrl of controls) {
       const bucket = elementTextBucket(ctrl);
       const disabled = ctrl.hasAttribute("disabled") || ctrl.getAttribute("aria-disabled") === "true";
@@ -110,6 +164,130 @@
       }
     }
     return false;
+  }
+
+  function hasLikelyDisabledSendControl(root, options = {}) {
+    const controls = queryAll(root, "button, [role='button']", options);
+    for (const ctrl of controls) {
+      const bucket = elementTextBucket(ctrl);
+      const disabled = ctrl.hasAttribute("disabled") || ctrl.getAttribute("aria-disabled") === "true";
+      if (!disabled) {
+        continue;
+      }
+      for (const keyword of SEND_KEYWORDS) {
+        if (bucket.includes(keyword)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  function hasInteractiveKeyword(root, keywords, options = {}) {
+    const controls = queryAll(root, "button, [role='button'], [title], [aria-label]", options);
+    for (const ctrl of controls) {
+      const bucket = elementTextBucket(ctrl);
+      for (const keyword of keywords) {
+        if (bucket.includes(keyword)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  function hasLikelyStreamingSignal(root, options = {}) {
+    return hasSelector(
+      root,
+      "[aria-busy='true'], [data-state*='generat'], [data-status*='generat'], [data-testid*='typing' i], [data-testid*='stream' i], [class*='typing'], [class*='stream'], [class*='writing'], [class*='cursor'], [class*='blink']",
+      options
+    );
+  }
+
+  function markKimiGeneratingHint(ms = KIMI_HINT_MS) {
+    const next = Date.now() + Math.max(1000, ms);
+    if (next > kimiGeneratingHintUntil) {
+      kimiGeneratingHintUntil = next;
+    }
+  }
+
+  function isKimiGeneratingHintActive() {
+    return Date.now() < kimiGeneratingHintUntil;
+  }
+
+  function setupKimiInteractionHints() {
+    const isOverlayTarget = (node) => {
+      const el = node instanceof Element ? node : null;
+      return !!el?.closest("#cat-monitor-overlay-host");
+    };
+
+    const isComposerTarget = (node) => {
+      const el = node instanceof Element ? node : null;
+      if (!el) {
+        return false;
+      }
+      return !!el.closest(".chat-input-editor, [contenteditable='true'], [role='textbox'], textarea");
+    };
+
+    const onKeydown = (event) => {
+      if (isOverlayTarget(event.target)) {
+        return;
+      }
+      if (event.isComposing) {
+        return;
+      }
+      if (event.key === "Enter" && !event.shiftKey && isComposerTarget(event.target)) {
+        markKimiGeneratingHint();
+        logDebug("kimi hint by enter");
+      }
+    };
+
+    const onClick = (event) => {
+      if (isOverlayTarget(event.target)) {
+        return;
+      }
+      const target = event.target instanceof Element ? event.target : null;
+      if (!target) {
+        return;
+      }
+
+      const clickable = target.closest("button, [role='button'], [role='menuitem'], [data-testid], [class], [title], [aria-label]");
+      if (!clickable) {
+        return;
+      }
+
+      const bucket = elementTextBucket(clickable);
+      const cls = normalizeText(clickable.className);
+      const testid = normalizeText(clickable.getAttribute("data-testid"));
+      const likelySend =
+        KIMI_HINT_CLICK_KEYWORDS.some((keyword) => bucket.includes(keyword)) ||
+        RETRY_KEYWORDS.some((keyword) => bucket.includes(keyword)) ||
+        bucket.includes("enter") ||
+        cls.includes("send") ||
+        cls.includes("submit") ||
+        cls.includes("retry") ||
+        cls.includes("regen") ||
+        testid.includes("send") ||
+        testid.includes("submit") ||
+        testid.includes("retry") ||
+        testid.includes("regen");
+
+      if (likelySend) {
+        markKimiGeneratingHint();
+        logDebug("kimi hint by click", { bucket, cls, testid });
+      }
+    };
+
+    document.addEventListener("keydown", onKeydown, true);
+    document.addEventListener("click", onClick, true);
+    window.addEventListener(
+      "beforeunload",
+      () => {
+        document.removeEventListener("keydown", onKeydown, true);
+        document.removeEventListener("click", onClick, true);
+      },
+      { once: true }
+    );
   }
 
   function makeGenericAdapter(site) {
@@ -141,11 +319,26 @@
     [SITES.GEMINI]: {
       site: SITES.GEMINI,
       detectGenerating(root) {
-        return hasKeywordControl(root, STOP_KEYWORDS) || !!root.querySelector("button[aria-label*='Stop']");
+        const deep = { includeShadow: true };
+        const hasExplicitStop =
+          hasSelector(
+            root,
+            "button[aria-label*='Stop generating' i], button[aria-label*='Stop response' i], button[aria-label*='停止生成'], button[aria-label*='停止回答'], [role='button'][aria-label*='Stop generating' i], [role='button'][aria-label*='Stop response' i], [role='button'][aria-label*='停止生成'], [role='button'][aria-label*='停止回答'], button[data-testid*='stop' i], [role='button'][data-testid*='stop' i]",
+            deep
+          ) || hasInteractiveKeyword(root, GEMINI_STOP_KEYWORDS, deep);
+        if (hasExplicitStop) {
+          return true;
+        }
+
+        const hasBusyOrStreaming = hasLikelyStreamingSignal(root, deep);
+        const sendDisabled = hasLikelyDisabledSendControl(root, deep);
+        return hasBusyOrStreaming && sendDisabled;
       },
       detectIdle(root) {
-        const hasPromptArea = !!root.querySelector("rich-textarea, textarea, [contenteditable='true']");
-        return !this.detectGenerating(root) && hasPromptArea;
+        // Gemini composer often remains mounted while generating; rely on actionable send controls instead.
+        const deep = { includeShadow: true };
+        const hasSend = hasLikelyEnabledSendControl(root, deep);
+        return !this.detectGenerating(root) && hasSend;
       }
     },
     [SITES.CLAUDE]: {
@@ -166,6 +359,38 @@
       detectIdle(root) {
         const hasComposer = !!root.querySelector("textarea, [contenteditable='true']");
         return !this.detectGenerating(root) && hasComposer;
+      }
+    },
+    [SITES.KIMI]: {
+      site: SITES.KIMI,
+      detectGenerating(root) {
+        const deep = { includeShadow: true };
+        const hasStopSelector = hasSelector(
+          root,
+          "button[aria-label*='Stop'], button[aria-label*='停止'], [role='button'][aria-label*='Stop'], [role='button'][aria-label*='停止'], button[data-testid*='stop' i], [role='button'][data-testid*='stop' i], button[class*='stop' i], [role='button'][class*='stop' i]",
+          deep
+        );
+        const hasStopLikeControl =
+          hasStopSelector ||
+          hasKeywordControl(root, STOP_KEYWORDS, deep) ||
+          hasInteractiveKeyword(root, ["stop", "停止", "停止生成", "停止回答", "停止输出", "中止"], deep);
+        if (hasStopLikeControl) {
+          return true;
+        }
+
+        // Kimi occasionally renders icon-only action controls; use stream/busy fallbacks.
+        const hasBusyOrStreaming = hasLikelyStreamingSignal(root, deep);
+        const sendDisabled = hasLikelyDisabledSendControl(root, deep);
+        if (hasBusyOrStreaming && sendDisabled) {
+          return true;
+        }
+
+        // Fallback when Kimi UI is canvas/shadow-heavy and no explicit controls are exposed.
+        return isKimiGeneratingHintActive();
+      },
+      detectIdle(root) {
+        const hasSend = hasLikelyEnabledSendControl(root, { includeShadow: true });
+        return !this.detectGenerating(root) && hasSend;
       }
     }
   };
@@ -463,7 +688,7 @@
     let currentStatus = null;
     let pendingStatus = null;
     let pendingSince = 0;
-    let lastMutationTs = 0;
+    let lastMutationTs = Date.now();
     let lastSeenGeneratingTs = 0;
     const GENERATING_SIGNAL_TIMEOUT_MS = 1800;
 
@@ -498,20 +723,19 @@
         lastSeenGeneratingTs = now;
         return STATUS.GENERATING;
       }
-      if (explicitIdle) {
-        return STATUS.IDLE;
-      }
-
-      // If stop/running signal has disappeared for a while, force idle.
-      if (currentStatus === STATUS.GENERATING && now - lastSeenGeneratingTs >= GENERATING_SIGNAL_TIMEOUT_MS) {
-        return STATUS.IDLE;
-      }
 
       if (currentStatus === STATUS.GENERATING) {
-        if (now - lastMutationTs >= IDLE_BY_INACTIVITY_MS) {
+        const generatingSignalStale = now - lastSeenGeneratingTs >= GENERATING_SIGNAL_TIMEOUT_MS;
+        const domInactive = now - lastMutationTs >= IDLE_BY_INACTIVITY_MS;
+        // Avoid premature idle flip while generating signals are momentarily unstable.
+        if (generatingSignalStale && domInactive) {
           return STATUS.IDLE;
         }
         return STATUS.GENERATING;
+      }
+
+      if (explicitIdle) {
+        return STATUS.IDLE;
       }
       return STATUS.IDLE;
     }
@@ -609,6 +833,10 @@
   const site = detectCurrentSite();
   if (!site) {
     return;
+  }
+
+  if (site === SITES.KIMI) {
+    setupKimiInteractionHints();
   }
 
   const adapter = adapters[site] || makeGenericAdapter(site);

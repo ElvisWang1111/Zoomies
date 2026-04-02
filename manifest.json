@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Zoomies : AI Output Cat Monitor",
-  "description": "Monitor ChatGPT/Gemini/Claude/DeepSeek generation status with a running cat overlay.",
+  "description": "Monitor ChatGPT/Gemini/Claude/DeepSeek/Kimi generation status with a running cat overlay.",
   "version": "0.1.0",
   "permissions": ["storage", "tabs", "scripting"],
   "host_permissions": [
@@ -11,7 +11,10 @@
     "https://claude.ai/*",
     "https://chat.deepseek.com/*",
     "https://www.deepseek.com/*",
-    "https://deepseek.com/*"
+    "https://deepseek.com/*",
+    "https://kimi.moonshot.cn/*",
+    "https://kimi.com/*",
+    "https://www.kimi.com/*"
   ],
   "background": {
     "service_worker": "src/background/worker.js"
