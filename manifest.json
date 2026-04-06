@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "Zoomies : AI Output Cat Monitor",
-  "description": "Monitor ChatGPT/Gemini/Claude/DeepSeek/Kimi generation status with a running cat overlay.",
-  "version": "0.1.0",
-  "permissions": ["storage", "tabs", "scripting"],
+  "name": "Zoomies: AI Generation Monitor",
+  "description": "A cat monitor that helps you track AI generation status across browser tabs.",
+  "version": "0.2.0",
+  "permissions": ["storage", "tabs"],
   "host_permissions": [
     "https://chatgpt.com/*",
     "https://chat.openai.com/*",
