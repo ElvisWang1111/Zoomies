@@ -1,6 +1,13 @@
-# Zoomies : AI Output Cat Monitor
+<p align='center'>
+<strong><em style="font-size: 36px;">Zoomies: A cat monitor that helps you track AI generation status across browser tabs.</em></strong>
+</p>
 
-[中文](./README.zh.md)
+![Zoomies Logo](./src/assets/Zoomies.png)
+
+<p align = 'center'>
+[<a href="https://chromewebstore.google.com/detail/jekbjoplbllcogkiledgbkjgallkonmp?utm_source=item-share-cb">Install link</a>]
+[<a href="./README.zh.md">中文</a>]
+<br>
 
 A Chrome Manifest V3 extension that monitors whether AI sites are generating output and shows a status cat at the bottom-right of the page.
 
