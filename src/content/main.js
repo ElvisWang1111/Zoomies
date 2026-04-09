@@ -435,7 +435,7 @@
         --border: rgba(255, 255, 255, 0.2);
         --provider-bg: rgba(255, 255, 255, 0.26);
         --provider-border: rgba(148, 163, 184, 0.3);
-        --provider-run-bg: rgba(14, 165, 233, 0.18);
+        --provider-run-bg: rgba(255, 237, 193, 0.4);
         --provider-run-border: rgba(104, 181, 228, 0.08);
         --cat-color: #f59e0b;
         color: var(--text-main);
