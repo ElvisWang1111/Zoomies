@@ -1,8 +1,16 @@
-# AI Output Cat Monitor
+<p align='center'>
+<strong><em style="font-size: 36px;">Zoomies: A cat monitor that helps you track AI generation status across browser tabs.</em></strong>
+</p>
 
-[English](./README.md)
+![Zoomies Logo](./src/assets/Zoomies.png)
+
+<p align = 'center'>
+| <a href="https://chromewebstore.google.com/detail/jekbjoplbllcogkiledgbkjgallkonmp?utm_source=item-share-cb"><b>安装链接</b></a> | <a href="./README.md"><b>英文</b></a> |
+</p>
 
 Chrome Manifest V3 扩展，用来监控多个 AI 站点是否正在输出，并在页面右下角显示一只“状态猫”。
+
+![Zoomies Logo](./src/assets/comic.png)
 
 ## 支持站点
 - ChatGPT: `chatgpt.com`, `chat.openai.com`

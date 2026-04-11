@@ -5,11 +5,12 @@
 ![Zoomies Logo](./src/assets/Zoomies.png)
 
 <p align = 'center'>
-[<a href="https://chromewebstore.google.com/detail/jekbjoplbllcogkiledgbkjgallkonmp?utm_source=item-share-cb">Install link</a>]
-[<a href="./README.zh.md">中文</a>]
-<br>
+| <a href="https://chromewebstore.google.com/detail/jekbjoplbllcogkiledgbkjgallkonmp?utm_source=item-share-cb"><b>Install link</b></a> | <a href="./README.zh.md"><b>CN</b></a> |
+</p>
 
 A Chrome Manifest V3 extension that monitors whether AI sites are generating output and shows a status cat at the bottom-right of the page.
+
+![Zoomies Logo](./src/assets/comic.png)
 
 ## Supported Sites
 - ChatGPT: `chatgpt.com`, `chat.openai.com`
