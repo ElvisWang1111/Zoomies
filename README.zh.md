@@ -18,6 +18,7 @@ Chrome Manifest V3 扩展，用来监控多个 AI 站点是否正在输出，并
 - Claude: `claude.ai`
 - DeepSeek: `chat.deepseek.com`, `deepseek.com`, `www.deepseek.com`
 - Kimi: `kimi.moonshot.cn`, `kimi.com`, `www.kimi.com`
+- Qwen: `chat.qwen.ai`, `qwen.ai`, `www.qwen.ai`
 
 ## 核心功能（当前实现）
 - 基于站点适配器的生成状态检测（`generating` / `idle`）。
@@ -60,7 +61,7 @@ Chrome Manifest V3 扩展，用来监控多个 AI 站点是否正在输出，并
 - `REGISTER_VIEW`：预留（当前未使用）
 
 ## 本地存储键
-- `siteEnabled`: `{ chatgpt, gemini, claude, deepseek, kimi }`（默认全开）
+- `siteEnabled`: `{ chatgpt, gemini, claude, deepseek, kimi, qwen }`（默认全开）
 - `debug`: `boolean`（默认 `false`）
 - `catCollapsed`: `boolean`（面板折叠状态）
 

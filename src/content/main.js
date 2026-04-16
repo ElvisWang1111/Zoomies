@@ -15,19 +15,33 @@
     { site: SITES.DEEPSEEK, pattern: /(^|\.)www\.deepseek\.com$/i },
     { site: SITES.KIMI, pattern: /(^|\.)kimi\.moonshot\.cn$/i },
     { site: SITES.KIMI, pattern: /(^|\.)kimi\.com$/i },
-    { site: SITES.KIMI, pattern: /(^|\.)www\.kimi\.com$/i }
+    { site: SITES.KIMI, pattern: /(^|\.)www\.kimi\.com$/i },
+    { site: SITES.QWEN, pattern: /(^|\.)chat\.qwen\.ai$/i },
+    { site: SITES.QWEN, pattern: /(^|\.)qwen\.ai$/i },
+    { site: SITES.QWEN, pattern: /(^|\.)www\.qwen\.ai$/i }
   ];
 
   const MIN_SWITCH_MS = 700;
   const IDLE_BY_INACTIVITY_MS = 2200;
   const CHECK_INTERVAL_MS = 900;
   const KIMI_HINT_MS = 1200;
+  const QWEN_HINT_MS = 2200;
 
   const STOP_KEYWORDS = ["stop", "停止", "停止生成"];
   const GEMINI_STOP_KEYWORDS = ["stop generating", "stop response", "停止生成", "停止回答", "停止输出"];
   const SEND_KEYWORDS = ["send", "发送", "submit", "run"];
   const RETRY_KEYWORDS = ["retry", "regenerate", "重新生成", "重试", "再试一次"];
   const KIMI_HINT_CLICK_KEYWORDS = ["send", "发送", "submit"];
+  const QWEN_GENERATING_TEXT_KEYWORDS = [
+    "正在读取来源",
+    "正在思考",
+    "正在搜索",
+    "正在生成",
+    "推理中",
+    "thinking",
+    "generating",
+    "reading sources"
+  ];
   const UI_STRINGS = {
     zh: {
       panelTitle: "LLM 状态概览",
@@ -56,6 +70,7 @@
   let debugEnabled = false;
   const lang = detectUiLang();
   let kimiGeneratingHintUntil = 0;
+  let qwenGeneratingHintUntil = 0;
 
   function detectUiLang() {
     const raw = (chrome.i18n?.getUILanguage?.() || navigator.language || "en").toLowerCase();
@@ -204,6 +219,20 @@
     );
   }
 
+  function hasKeywordText(root, selector, keywords, options = {}) {
+    const limit = Number.isFinite(options.limit) ? options.limit : 200;
+    const nodes = queryAll(root, selector, { ...options, limit });
+    for (const node of nodes) {
+      const bucket = elementTextBucket(node);
+      for (const keyword of keywords) {
+        if (bucket.includes(keyword)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   function markKimiGeneratingHint(ms = KIMI_HINT_MS) {
     const next = Date.now() + Math.max(1000, ms);
     if (next > kimiGeneratingHintUntil) {
@@ -213,6 +242,17 @@
 
   function isKimiGeneratingHintActive() {
     return Date.now() < kimiGeneratingHintUntil;
+  }
+
+  function markQwenGeneratingHint(ms = QWEN_HINT_MS) {
+    const next = Date.now() + Math.max(1000, ms);
+    if (next > qwenGeneratingHintUntil) {
+      qwenGeneratingHintUntil = next;
+    }
+  }
+
+  function isQwenGeneratingHintActive() {
+    return Date.now() < qwenGeneratingHintUntil;
   }
 
   function setupKimiInteractionHints() {
@@ -275,6 +315,84 @@
       if (likelySend) {
         markKimiGeneratingHint();
         logDebug("kimi hint by click", { bucket, cls, testid });
+      }
+    };
+
+    document.addEventListener("keydown", onKeydown, true);
+    document.addEventListener("click", onClick, true);
+    window.addEventListener(
+      "beforeunload",
+      () => {
+        document.removeEventListener("keydown", onKeydown, true);
+        document.removeEventListener("click", onClick, true);
+      },
+      { once: true }
+    );
+  }
+
+  function setupQwenInteractionHints() {
+    const isOverlayTarget = (node) => {
+      const el = node instanceof Element ? node : null;
+      return !!el?.closest("#cat-monitor-overlay-host");
+    };
+
+    const isComposerTarget = (node) => {
+      const el = node instanceof Element ? node : null;
+      if (!el) {
+        return false;
+      }
+      return !!el.closest(".chat-input-editor, [contenteditable='true'], [role='textbox'], textarea");
+    };
+
+    const onKeydown = (event) => {
+      if (isOverlayTarget(event.target) || event.isComposing) {
+        return;
+      }
+      if (event.key === "Enter" && !event.shiftKey && isComposerTarget(event.target)) {
+        markQwenGeneratingHint();
+        logDebug("qwen hint by enter");
+      }
+    };
+
+    const onClick = (event) => {
+      if (isOverlayTarget(event.target)) {
+        return;
+      }
+      const target = event.target instanceof Element ? event.target : null;
+      if (!target) {
+        return;
+      }
+
+      const clickable = target.closest("button, [role='button'], [role='menuitem'], [data-testid], [class], [title], [aria-label]");
+      if (!clickable) {
+        return;
+      }
+
+      const bucket = elementTextBucket(clickable);
+      const cls = normalizeText(clickable.className);
+      const testid = normalizeText(clickable.getAttribute("data-testid"));
+      const disabled = clickable.hasAttribute("disabled") || clickable.getAttribute("aria-disabled") === "true";
+      const inComposer = !!clickable.closest(".chat-input-editor, [contenteditable='true'], [role='textbox'], textarea, form");
+      const looksLikeStop = bucket.includes("stop") || bucket.includes("停止") || cls.includes("stop") || testid.includes("stop");
+      const likelySend =
+        KIMI_HINT_CLICK_KEYWORDS.some((keyword) => bucket.includes(keyword)) ||
+        RETRY_KEYWORDS.some((keyword) => bucket.includes(keyword)) ||
+        bucket.includes("enter") ||
+        cls.includes("send") ||
+        cls.includes("submit") ||
+        cls.includes("retry") ||
+        cls.includes("regen") ||
+        cls.includes("emit") ||
+        testid.includes("send") ||
+        testid.includes("submit") ||
+        testid.includes("retry") ||
+        testid.includes("regen") ||
+        testid.includes("emit") ||
+        (inComposer && !disabled && !looksLikeStop);
+
+      if (likelySend) {
+        markQwenGeneratingHint();
+        logDebug("qwen hint by click", { bucket, cls, testid });
       }
     };
 
@@ -391,6 +509,46 @@
       detectIdle(root) {
         const hasSend = hasLikelyEnabledSendControl(root, { includeShadow: true });
         return !this.detectGenerating(root) && hasSend;
+      }
+    },
+    [SITES.QWEN]: {
+      site: SITES.QWEN,
+      detectGenerating(root) {
+        const deep = { includeShadow: true };
+        const hasStopLikeControl =
+          hasSelector(
+            root,
+            "button[aria-label*='Stop' i], button[aria-label*='停止'], [role='button'][aria-label*='Stop' i], [role='button'][aria-label*='停止'], button[data-testid*='stop' i], [role='button'][data-testid*='stop' i], button[class*='stop' i], [role='button'][class*='stop' i]",
+            deep
+          ) ||
+          hasInteractiveKeyword(root, ["stop", "停止", "停止生成", "停止回答", "中止"], deep);
+        if (hasStopLikeControl) {
+          return true;
+        }
+
+        const hasQwenStatusText = hasKeywordText(
+          root,
+          "[aria-live], [role='status'], [class*='status' i], [class*='loading' i], [class*='think' i], [class*='stream' i], [class*='typing' i], [class*='source' i]",
+          QWEN_GENERATING_TEXT_KEYWORDS,
+          { ...deep, limit: 240 }
+        );
+        if (hasQwenStatusText) {
+          return true;
+        }
+
+        const hasBusyOrStreaming = hasLikelyStreamingSignal(root, deep);
+        const sendDisabled = hasLikelyDisabledSendControl(root, deep);
+        if (hasBusyOrStreaming && sendDisabled) {
+          return true;
+        }
+
+        return isQwenGeneratingHintActive();
+      },
+      detectIdle(root) {
+        const hasComposer = hasSelector(root, "textarea, [contenteditable='true'], [role='textbox'], .chat-input-editor", {
+          includeShadow: true
+        });
+        return !this.detectGenerating(root) && hasComposer;
       }
     }
   };
@@ -690,11 +848,23 @@
     let pendingSince = 0;
     let lastMutationTs = Date.now();
     let lastSeenGeneratingTs = 0;
+    let observedRoot = null;
     const GENERATING_SIGNAL_TIMEOUT_MS = 1800;
+    const OBSERVER_OPTIONS = {
+      childList: true,
+      subtree: true,
+      characterData: true,
+      attributes: true,
+      attributeFilter: ["aria-label", "title", "disabled", "aria-disabled", "data-testid"]
+    };
 
     function sendStatus(nextStatus) {
       if (nextStatus === currentStatus) {
         return;
+      }
+
+      if (nextStatus === STATUS.GENERATING) {
+        lastSeenGeneratingTs = Date.now();
       }
 
       currentStatus = nextStatus;
@@ -725,6 +895,19 @@
       }
 
       if (currentStatus === STATUS.GENERATING) {
+        // Background tabs often throttle DOM updates; keep generating until we see
+        // an explicit idle signal or the tab becomes visible again.
+        if (document.hidden) {
+          if (explicitIdle) {
+            return STATUS.IDLE;
+          }
+          return STATUS.GENERATING;
+        }
+
+        if (explicitIdle) {
+          return STATUS.IDLE;
+        }
+
         const generatingSignalStale = now - lastSeenGeneratingTs >= GENERATING_SIGNAL_TIMEOUT_MS;
         const domInactive = now - lastMutationTs >= IDLE_BY_INACTIVITY_MS;
         // Avoid premature idle flip while generating signals are momentarily unstable.
@@ -740,11 +923,32 @@
       return STATUS.IDLE;
     }
 
-    function evaluate() {
+    const observer = new MutationObserver(() => {
+      lastMutationTs = Date.now();
+      evaluate();
+    });
+
+    function ensureObserverAttached(force = false) {
       const root = document.body;
       if (!root) {
+        return false;
+      }
+      if (!force && observedRoot === root) {
+        return true;
+      }
+      observer.disconnect();
+      observer.observe(root, OBSERVER_OPTIONS);
+      observedRoot = root;
+      lastMutationTs = Date.now();
+      logDebug("observer attached", { site });
+      return true;
+    }
+
+    function evaluate() {
+      if (!ensureObserverAttached()) {
         return;
       }
+      const root = observedRoot;
 
       const explicitGenerating = adapter.detectGenerating(root);
       const explicitIdle = adapter.detectIdle(root);
@@ -777,24 +981,32 @@
       }
     }
 
-    const observer = new MutationObserver(() => {
-      lastMutationTs = Date.now();
-      evaluate();
+    const rootObserver = new MutationObserver(() => {
+      if (document.body !== observedRoot) {
+        ensureObserverAttached(true);
+        evaluate();
+      }
     });
 
-    if (document.body) {
-      observer.observe(document.body, {
-        childList: true,
-        subtree: true,
-        characterData: true,
-        attributes: true,
-        attributeFilter: ["aria-label", "title", "disabled", "aria-disabled", "data-testid"]
+    if (document.documentElement) {
+      rootObserver.observe(document.documentElement, {
+        childList: true
       });
     }
 
+    ensureObserverAttached(true);
     const timer = window.setInterval(evaluate, CHECK_INTERVAL_MS);
+    const onVisibilityOrShow = () => {
+      ensureObserverAttached();
+      evaluate();
+    };
+    document.addEventListener("visibilitychange", onVisibilityOrShow);
+    window.addEventListener("pageshow", onVisibilityOrShow);
     window.addEventListener("beforeunload", () => {
       observer.disconnect();
+      rootObserver.disconnect();
+      document.removeEventListener("visibilitychange", onVisibilityOrShow);
+      window.removeEventListener("pageshow", onVisibilityOrShow);
       window.clearInterval(timer);
     });
 
@@ -837,6 +1049,8 @@
 
   if (site === SITES.KIMI) {
     setupKimiInteractionHints();
+  } else if (site === SITES.QWEN) {
+    setupQwenInteractionHints();
   }
 
   const adapter = adapters[site] || makeGenericAdapter(site);

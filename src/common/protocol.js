@@ -12,7 +12,8 @@
     GEMINI: "gemini",
     CLAUDE: "claude",
     DEEPSEEK: "deepseek",
-    KIMI: "kimi"
+    KIMI: "kimi",
+    QWEN: "qwen"
   };
 
   const SITE_LABELS = {
@@ -20,7 +21,8 @@
     [SITES.GEMINI]: "Gemini",
     [SITES.CLAUDE]: "Claude",
     [SITES.DEEPSEEK]: "DeepSeek",
-    [SITES.KIMI]: "Kimi"
+    [SITES.KIMI]: "Kimi",
+    [SITES.QWEN]: "Qwen"
   };
 
   const STATUS = {

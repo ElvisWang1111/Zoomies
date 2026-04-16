@@ -7,7 +7,8 @@ const DEFAULT_SITE_ENABLED = {
   [SITES.GEMINI]: true,
   [SITES.CLAUDE]: true,
   [SITES.DEEPSEEK]: true,
-  [SITES.KIMI]: true
+  [SITES.KIMI]: true,
+  [SITES.QWEN]: true
 };
 
 const statusByTabSite = new Map();
@@ -66,6 +67,9 @@ function detectSiteFromUrl(urlString) {
     }
     if (/(^|\.)kimi\.moonshot\.cn$/i.test(host) || /(^|\.)kimi\.com$/i.test(host) || /(^|\.)www\.kimi\.com$/i.test(host)) {
       return SITES.KIMI;
+    }
+    if (/(^|\.)chat\.qwen\.ai$/i.test(host) || /(^|\.)qwen\.ai$/i.test(host) || /(^|\.)www\.qwen\.ai$/i.test(host)) {
+      return SITES.QWEN;
     }
     return null;
   } catch {

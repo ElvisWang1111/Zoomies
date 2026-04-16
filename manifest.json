@@ -14,7 +14,10 @@
     "https://deepseek.com/*",
     "https://kimi.moonshot.cn/*",
     "https://kimi.com/*",
-    "https://www.kimi.com/*"
+    "https://www.kimi.com/*",
+    "https://chat.qwen.ai/*",
+    "https://qwen.ai/*",
+    "https://www.qwen.ai/*"
   ],
   "background": {
     "service_worker": "src/background/worker.js"
