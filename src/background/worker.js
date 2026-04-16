@@ -336,6 +336,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === MESSAGE_TYPES.FOCUS_TAB) {
+    const targetTabId = message?.data?.tabId;
+    if (typeof targetTabId !== "number") {
+      sendResponse({ ok: false, error: "invalid tab id" });
+      return;
+    }
+
+    chrome.tabs.update(targetTabId, { active: true }, (tab) => {
+      if (chrome.runtime.lastError || !tab) {
+        sendResponse({ ok: false, error: "failed to focus tab" });
+        return;
+      }
+      sendResponse({ ok: true });
+    });
+    return true;
+  }
+
   if (message.type !== MESSAGE_TYPES.STATUS_CHANGED) {
     return;
   }

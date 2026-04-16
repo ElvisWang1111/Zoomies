@@ -595,7 +595,7 @@
         --provider-border: rgba(148, 163, 184, 0.3);
         --provider-run-bg: rgba(255, 237, 193, 0.4);
         --provider-run-border: rgba(104, 181, 228, 0.08);
-        --cat-color: #f59e0b;
+        --cat-color:hsl(38, 92.10%, 50.20%);
         color: var(--text-main);
         display: flex;
         align-items: flex-start;
@@ -663,7 +663,7 @@
         pointer-events: auto;
         cursor: pointer;
         border: 1px solid var(--provider-border);
-        background: rgba(255, 255, 255, 0.35);
+        background:rgba(255, 255, 255, 0.26);
         color: var(--text-main);
         border-radius: 999px;
         font-size: 10px;
@@ -686,6 +686,12 @@
         border-radius: 10px;
         background: var(--provider-bg);
         padding: 6px 8px;
+      }
+      .provider-row.clickable {
+        cursor: pointer;
+      }
+      .provider-row.clickable:hover {
+        border-color:rgba(201, 199, 199, 0.48);
       }
       .provider-row.running {
         border-color: var(--provider-run-border);
@@ -761,6 +767,21 @@
 
     let collapsed = false;
 
+    function requestFocusTab(tabId) {
+      if (typeof tabId !== "number") {
+        return;
+      }
+      chrome.runtime.sendMessage(
+        {
+          type: MESSAGE_TYPES.FOCUS_TAB,
+          data: { tabId }
+        },
+        () => {
+          void chrome.runtime.lastError;
+        }
+      );
+    }
+
     function renderInstanceCards(instances) {
       const rows = Array.isArray(instances)
         ? [...instances].sort((a, b) => {
@@ -775,6 +796,20 @@
       for (const item of rows) {
         const row = document.createElement("div");
         row.className = "provider-row";
+        if (typeof item.tabId === "number") {
+          row.classList.add("clickable");
+          row.setAttribute("role", "button");
+          row.tabIndex = 0;
+          row.addEventListener("click", () => {
+            requestFocusTab(item.tabId);
+          });
+          row.addEventListener("keydown", (event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              requestFocusTab(item.tabId);
+            }
+          });
+        }
         if (item.status === STATUS.GENERATING) {
           row.classList.add("running");
         }
